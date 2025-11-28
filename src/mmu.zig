@@ -3,6 +3,7 @@
 
 const std = @import("std");
 const MBC = @import("mbc.zig").MBC;
+const APU = @import("apu.zig").APU;
 
 pub const MMU = struct {
     rom: []const u8 = &.{},
@@ -48,6 +49,9 @@ pub const MMU = struct {
 
     mbc: MBC = .none,
 
+    // APU reference (set by GB after init)
+    apu: ?*APU = null,
+
     pub fn read(self: *MMU, addr: u16) u8 {
         return switch (addr) {
             // ROM Bank 0 (fixed)
@@ -87,8 +91,8 @@ pub const MMU = struct {
             0xFF07 => self.tac,
             0xFF0F => self.if_,
 
-            // Audio registers - not emulated
-            0xFF10...0xFF3F => 0xFF,
+            // Audio registers
+            0xFF10...0xFF3F => if (self.apu) |apu| apu.readRegister(addr) else 0xFF,
 
             // LCD registers
             0xFF40 => self.lcdc,
@@ -157,8 +161,8 @@ pub const MMU = struct {
             0xFF07 => self.tac = val,
             0xFF0F => self.if_ = val,
 
-            // Audio registers - not emulated
-            0xFF10...0xFF3F => {},
+            // Audio registers
+            0xFF10...0xFF3F => if (self.apu) |apu| apu.writeRegister(addr, val),
 
             // LCD registers
             0xFF40 => self.lcdc = val,
@@ -266,10 +270,7 @@ pub const MMU = struct {
             0x00 => .none,
             0x01, 0x02, 0x03 => .{ .mbc1 = .{} },
             0x0F, 0x10, 0x11, 0x12, 0x13 => .{ .mbc3 = .{} },
-            else => {
-                std.debug.print("Unknown cartridge type: 0x{X:0>2}\n", .{cart_type});
-                return error.UnsupportedMBC;
-            },
+            else => return error.UnsupportedMBC,
         };
     }
 };

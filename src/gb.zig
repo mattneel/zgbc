@@ -5,6 +5,7 @@ const CPU = @import("cpu.zig").CPU;
 const MMU = @import("mmu.zig").MMU;
 const Timer = @import("timer.zig").Timer;
 const PPU = @import("ppu.zig").PPU;
+const APU = @import("apu.zig").APU;
 
 /// Cycles per frame (154 scanlines * 456 cycles)
 pub const CYCLES_PER_FRAME: u32 = 70224;
@@ -13,11 +14,17 @@ pub const GB = struct {
     cpu: CPU = .{},
     mmu: MMU = .{},
     ppu: PPU = .{},
+    apu: APU = .{},
 
     cycles: u64 = 0, // Total cycles elapsed
 
     /// Execute one instruction, return cycles consumed
     pub fn step(self: *GB) u8 {
+        // Wire APU to MMU on first call
+        if (self.mmu.apu == null) {
+            self.mmu.apu = &self.apu;
+        }
+
         const cycles = self.cpu.step(&self.mmu);
 
         // Update timer
@@ -29,6 +36,9 @@ pub const GB = struct {
             &self.mmu.if_,
             cycles,
         );
+
+        // Update APU
+        self.apu.tick(cycles);
 
         // Update PPU (LY counter, interrupts)
         const prev_ly = self.mmu.ly;
@@ -70,6 +80,11 @@ pub const GB = struct {
     /// Get frame buffer (160x144 2-bit color indices)
     pub fn getFrameBuffer(self: *GB) *const [160 * 144]u8 {
         return &self.ppu.frame_buffer;
+    }
+
+    /// Get audio samples (stereo i16, 44100 Hz)
+    pub fn getAudioSamples(self: *GB, out: []i16) usize {
+        return self.apu.readSamples(out);
     }
 
     /// Load a ROM

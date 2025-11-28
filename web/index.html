@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>zgbc - Game Boy Emulator</title>
+    <style>
+        body {
+            background: #1a1a2e;
+            color: #eee;
+            font-family: system-ui, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 2rem;
+            margin: 0;
+        }
+        h1 { color: #9bbc0f; margin-bottom: 0.5rem; }
+        .subtitle { color: #666; margin-bottom: 2rem; }
+        canvas {
+            border: 4px solid #333;
+            border-radius: 8px;
+            image-rendering: pixelated;
+            background: #0f380f;
+        }
+        .controls {
+            margin-top: 1rem;
+            display: flex;
+            gap: 1rem;
+            align-items: center;
+        }
+        input[type="file"] { display: none; }
+        label, button {
+            background: #306230;
+            color: #9bbc0f;
+            padding: 0.5rem 1rem;
+            border-radius: 4px;
+            cursor: pointer;
+            border: none;
+            font-size: 1rem;
+        }
+        label:hover, button:hover { background: #8bac0f; color: #0f380f; }
+        .keys {
+            margin-top: 2rem;
+            color: #666;
+            font-size: 0.9rem;
+        }
+        .keys kbd {
+            background: #333;
+            padding: 0.2rem 0.5rem;
+            border-radius: 3px;
+            margin: 0 0.2rem;
+        }
+        #fps { color: #9bbc0f; font-family: monospace; }
+        #mute {
+            background: #444;
+            font-size: 0.8rem;
+            padding: 0.3rem 0.6rem;
+        }
+        #mute.muted { background: #633; }
+    </style>
+</head>
+<body>
+    <h1>zgbc</h1>
+    <p class="subtitle">Game Boy Emulator in Zig + WASM</p>
+
+    <canvas id="screen" width="160" height="144"></canvas>
+
+    <div class="controls">
+        <label for="rom">Load ROM</label>
+        <input type="file" id="rom" accept=".gb,.gbc">
+        <button id="mute">Sound: ON</button>
+        <span id="fps">-- FPS</span>
+    </div>
+
+    <div class="keys">
+        <kbd>Arrow keys</kbd> D-Pad |
+        <kbd>Z</kbd> A |
+        <kbd>X</kbd> B |
+        <kbd>Enter</kbd> Start |
+        <kbd>Shift</kbd> Select
+    </div>
+
+    <script>
+        const canvas = document.getElementById('screen');
+        const ctx = canvas.getContext('2d');
+        const fpsEl = document.getElementById('fps');
+        const muteBtn = document.getElementById('mute');
+
+        // Scale canvas 3x
+        canvas.style.width = '480px';
+        canvas.style.height = '432px';
+
+        let wasm = null;
+        let running = false;
+        let buttons = 0;
+        let audioCtx = null;
+        let audioEnabled = true;
+
+        // Button bits: A=0, B=1, Select=2, Start=3, Right=4, Left=5, Up=6, Down=7
+        const keyMap = {
+            'z': 0,           // A
+            'x': 1,           // B
+            'Shift': 2,       // Select
+            'Enter': 3,       // Start
+            'ArrowRight': 4,  // Right
+            'ArrowLeft': 5,   // Left
+            'ArrowUp': 6,     // Up
+            'ArrowDown': 7    // Down
+        };
+
+        document.addEventListener('keydown', e => {
+            if (keyMap.hasOwnProperty(e.key)) {
+                buttons |= (1 << keyMap[e.key]);
+                e.preventDefault();
+            }
+        });
+
+        document.addEventListener('keyup', e => {
+            if (keyMap.hasOwnProperty(e.key)) {
+                buttons &= ~(1 << keyMap[e.key]);
+                e.preventDefault();
+            }
+        });
+
+        muteBtn.addEventListener('click', () => {
+            audioEnabled = !audioEnabled;
+            muteBtn.textContent = audioEnabled ? 'Sound: ON' : 'Sound: OFF';
+            muteBtn.classList.toggle('muted', !audioEnabled);
+        });
+
+        async function init() {
+            const response = await fetch('zgbc.wasm');
+            const bytes = await response.arrayBuffer();
+            const { instance } = await WebAssembly.instantiate(bytes, {});
+            wasm = instance.exports;
+            wasm.init();
+        }
+
+        let nextAudioTime = 0;
+        let gainNode = null;
+
+        function initAudio() {
+            if (audioCtx) return;
+            audioCtx = new AudioContext({ sampleRate: 44100 });
+            gainNode = audioCtx.createGain();
+            gainNode.gain.value = 0.5;  // Reduce volume
+            gainNode.connect(audioCtx.destination);
+            nextAudioTime = audioCtx.currentTime;
+        }
+
+        function playAudio() {
+            if (!audioCtx || !audioEnabled) return;
+
+            const sampleCount = wasm.getAudioSamples();
+            if (sampleCount === 0) return;
+
+            const audioPtr = wasm.getAudioBuffer();
+            const samples = new Int16Array(wasm.memory.buffer, audioPtr, sampleCount);
+
+            // Convert stereo i16 to float32 for Web Audio
+            const frameCount = Math.floor(sampleCount / 2);
+            const buffer = audioCtx.createBuffer(2, frameCount, 44100);
+            const left = buffer.getChannelData(0);
+            const right = buffer.getChannelData(1);
+
+            for (let i = 0; i < frameCount; i++) {
+                left[i] = samples[i * 2] / 32768;
+                right[i] = samples[i * 2 + 1] / 32768;
+            }
+
+            const source = audioCtx.createBufferSource();
+            source.buffer = buffer;
+            source.connect(gainNode);
+
+            // Schedule seamlessly after previous buffer
+            const now = audioCtx.currentTime;
+            if (nextAudioTime < now) {
+                nextAudioTime = now;
+            }
+            source.start(nextAudioTime);
+            nextAudioTime += buffer.duration;
+        }
+
+        document.getElementById('rom').addEventListener('change', async e => {
+            const file = e.target.files[0];
+            if (!file || !wasm) return;
+
+            // Initialize audio on user interaction
+            initAudio();
+
+            const data = new Uint8Array(await file.arrayBuffer());
+            const romPtr = wasm.getRomBuffer();
+            const heap = new Uint8Array(wasm.memory.buffer);
+            heap.set(data, romPtr);
+
+            if (wasm.loadRom(data.length)) {
+                running = true;
+                requestAnimationFrame(gameLoop);
+            } else {
+                alert('Failed to load ROM');
+            }
+        });
+
+        let lastTime = performance.now();
+        let frameCount = 0;
+        let lastFrameTime = 0;
+        const FRAME_TIME = 1000 / 60;  // ~16.67ms per frame
+
+        function gameLoop(now) {
+            if (!running) return;
+
+            // Limit to 60 FPS
+            const elapsed = now - lastFrameTime;
+            if (elapsed < FRAME_TIME) {
+                requestAnimationFrame(gameLoop);
+                return;
+            }
+            lastFrameTime = now - (elapsed % FRAME_TIME);
+
+            wasm.setInput(buttons);
+            wasm.frame();
+
+            // Get frame buffer and render
+            const framePtr = wasm.getFrame();
+            const pixels = new Uint32Array(wasm.memory.buffer, framePtr, 160 * 144);
+            const imageData = ctx.createImageData(160, 144);
+            const data = new Uint32Array(imageData.data.buffer);
+            data.set(pixels);
+            ctx.putImageData(imageData, 0, 0);
+
+            // Play audio
+            playAudio();
+
+            // FPS counter
+            frameCount++;
+            if (now - lastTime >= 1000) {
+                fpsEl.textContent = `${frameCount} FPS`;
+                frameCount = 0;
+                lastTime = now;
+            }
+
+            requestAnimationFrame(gameLoop);
+        }
+
+        init();
+    </script>
+</body>
+</html>
