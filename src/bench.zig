@@ -1,10 +1,10 @@
-//! zgbc Benchmark
+//! libzetro Benchmark
 //! Measures raw emulation performance.
 
 const std = @import("std");
-const GB = @import("gb.zig").GB;
+const GB = @import("gb/system.zig").GB;
 const simd_batch = @import("simd_batch.zig");
-const PPU = @import("ppu.zig").PPU;
+const PPU = @import("gb/ppu.zig").PPU;
 
 const BENCH_FRAMES = 10_000;
 

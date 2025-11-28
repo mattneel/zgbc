@@ -1,19 +1,25 @@
-//! zgbc - Zig Game Boy Emulator Core
+//! libzetro - Multi-system Emulator Core
 //! Minimal, high-performance emulator for headless execution.
 
 const std = @import("std");
 
-// Re-export core types
-pub const GB = @import("gb.zig").GB;
-pub const CPU = @import("cpu.zig").CPU;
-pub const Flags = @import("cpu.zig").Flags;
-pub const MMU = @import("mmu.zig").MMU;
-pub const Timer = @import("timer.zig").Timer;
-pub const MBC = @import("mbc.zig").MBC;
-pub const PPU = @import("ppu.zig").PPU;
-pub const PALETTE = @import("ppu.zig").PALETTE;
-pub const APU = @import("apu.zig").APU;
-pub const SaveState = @import("gb.zig").SaveState;
+// Core interface
+pub const Core = @import("core.zig").Core;
+
+// Game Boy
+pub const gb = @import("gb/system.zig");
+pub const GB = gb.GB;
+pub const SaveState = gb.SaveState;
+
+// Re-export GB internals for backwards compatibility
+pub const CPU = @import("gb/cpu.zig").CPU;
+pub const Flags = @import("gb/cpu.zig").Flags;
+pub const MMU = @import("gb/mmu.zig").MMU;
+pub const Timer = @import("gb/timer.zig").Timer;
+pub const MBC = @import("gb/mbc.zig").MBC;
+pub const PPU = @import("gb/ppu.zig").PPU;
+pub const PALETTE = @import("gb/ppu.zig").PALETTE;
+pub const APU = @import("gb/apu.zig").APU;
 
 // SIMD batch processing
 pub const simd = @import("simd_batch.zig");

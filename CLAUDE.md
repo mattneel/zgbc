@@ -4,39 +4,45 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-zgbc is a minimal, high-performance Game Boy (DMG) emulator core written in Zig 0.16. Designed for headless execution (reinforcement learning, fuzzing, automated testing) rather than pixel-perfect graphics or audio.
+libzetro is a multi-system emulator core written in Zig 0.16. Designed for headless execution (reinforcement learning, fuzzing, automated testing) rather than pixel-perfect graphics or audio.
 
-**Goals:** 5M+ frames/sec single-threaded, RAM-based observations, <1500 lines total
-**Non-Goals:** PPU rendering, audio, link cable, GBC extended features, debugger UI
+**Goals:** 5M+ frames/sec single-threaded, RAM-based observations, unified Core interface across systems
+**Non-Goals:** pixel-perfect rendering, debugger UI
 
 ## Build Commands
 
 ```bash
-zig build              # Build the executable (output: zig-out/bin/zgbc)
+zig build              # Build the executable
 zig build run          # Build and run
-zig build run -- args  # Build and run with arguments
-zig build test         # Run unit tests (both module and executable tests)
-zig build test-blargg  # Run Blargg CPU instruction test ROMs
-zig build test --fuzz  # Run tests with fuzzing enabled
+zig build test         # Run unit tests
+zig build test-blargg  # Run Blargg CPU instruction test ROMs (GB)
+zig build wasm         # Build WASM module
+zig build lib          # Build C libraries (libzgbc.so + libzgbc.a)
 ```
 
 ## Architecture
 
-The codebase follows a split module pattern:
-- `src/root.zig` - Library module (exposed as "zgbc" to consumers)
-- `src/main.zig` - CLI executable that imports the zgbc module
-
-### Planned Structure (from SPEC.md)
+Multi-system emulator with unified Core interface:
 
 ```
 src/
-├── main.zig      # CLI / test harness
-├── gb.zig        # Top-level Game Boy state
-├── cpu.zig       # LR35902 CPU (SM83 core, NOT Z80)
-├── mmu.zig       # Memory management unit
-├── mbc.zig       # Memory bank controllers (MBC1, MBC3)
-├── timer.zig     # Timer / DIV
-└── opcodes.zig   # Instruction implementations
+├── core.zig          # Generic Core interface
+├── root.zig          # Library exports
+├── main.zig          # CLI executable
+├── gb/               # Game Boy (complete)
+│   ├── system.zig    # GB-specific Core impl
+│   ├── cpu.zig       # LR35902 (SM83)
+│   ├── ppu.zig
+│   ├── apu.zig
+│   ├── mmu.zig
+│   ├── mbc.zig       # MBC1, MBC3
+│   └── timer.zig
+├── nes/              # NES (planned)
+│   └── ...
+├── simd_batch.zig    # SIMD batch executor
+├── c_api.zig         # C FFI bindings
+├── wasm.zig          # WASM bindings
+└── bench.zig         # Benchmarks
 ```
 
 ## Zig 0.16 Specifics

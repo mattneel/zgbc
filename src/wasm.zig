@@ -1,10 +1,10 @@
 //! WASM bindings for browser deployment
 //! Exports a minimal API for running Game Boy games in the browser.
 
-const gb_mod = @import("gb.zig");
+const gb_mod = @import("gb/system.zig");
 const GB = gb_mod.GB;
 const SaveState = gb_mod.SaveState;
-const ppu = @import("ppu.zig");
+const ppu = @import("gb/ppu.zig");
 const PALETTE = ppu.PALETTE;
 
 var gb: GB = .{};

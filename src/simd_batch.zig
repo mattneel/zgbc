@@ -2,9 +2,9 @@
 //! Runs multiple GB instances in lock-step using SIMD operations.
 
 const std = @import("std");
-const GB = @import("gb.zig").GB;
-const CPU = @import("cpu.zig").CPU;
-const MMU = @import("mmu.zig").MMU;
+const GB = @import("gb/system.zig").GB;
+const CPU = @import("gb/cpu.zig").CPU;
+const MMU = @import("gb/mmu.zig").MMU;
 
 pub const BATCH_SIZE = 16;
 const Vec16u8 = @Vector(BATCH_SIZE, u8);
@@ -211,7 +211,7 @@ test "simd inc" {
 // Micro-benchmarks for SIMD vs Scalar ALU operations
 // =============================================================================
 
-const Flags = @import("cpu.zig").Flags;
+const Flags = @import("gb/cpu.zig").Flags;
 
 /// Scalar ADD A, n with flag computation
 fn scalarAdd(a: *u8, f: *Flags, val: u8) void {

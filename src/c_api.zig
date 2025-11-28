@@ -1,11 +1,11 @@
-//! C FFI bindings for libzgbc
+//! C FFI bindings for libzetro
 //! Exposes all emulator features with stable C ABI.
 
 const std = @import("std");
-const gb_mod = @import("gb.zig");
+const gb_mod = @import("gb/system.zig");
 const GB = gb_mod.GB;
 const SaveState = gb_mod.SaveState;
-const ppu = @import("ppu.zig");
+const ppu = @import("gb/ppu.zig");
 
 /// Opaque handle to a Game Boy instance
 pub const zgbc_t = opaque {};
