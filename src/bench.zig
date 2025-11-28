@@ -3,6 +3,7 @@
 
 const std = @import("std");
 const GB = @import("gb.zig").GB;
+const simd_batch = @import("simd_batch.zig");
 
 const BENCH_FRAMES = 10_000;
 
@@ -85,4 +86,7 @@ pub fn main() !void {
             num_threads, fps, per_thread, scaling,
         });
     }
+
+    // SIMD ALU micro-benchmark
+    try simd_batch.benchmarkALU();
 }

@@ -11,6 +11,11 @@ pub const MMU = @import("mmu.zig").MMU;
 pub const Timer = @import("timer.zig").Timer;
 pub const MBC = @import("mbc.zig").MBC;
 
+// SIMD batch processing
+pub const simd = @import("simd_batch.zig");
+pub const BatchCPU = simd.BatchCPU;
+pub const BATCH_SIZE = simd.BATCH_SIZE;
+
 /// Button state for joypad input
 pub const Buttons = packed struct(u8) {
     a: bool = false,
