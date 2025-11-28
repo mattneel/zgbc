@@ -19,7 +19,7 @@ pub const MBC = union(enum) {
         return if (rom_addr < rom.len) rom[rom_addr] else 0xFF;
     }
 
-    pub fn readRam(self: *MBC, eram: *[32768]u8, addr: u16) u8 {
+    pub fn readRam(self: *MBC, eram: *[8192]u8, addr: u16) u8 {
         return switch (self.*) {
             .none => 0xFF,
             .mbc1 => |m| blk: {
@@ -38,7 +38,7 @@ pub const MBC = union(enum) {
         };
     }
 
-    pub fn writeRam(self: *MBC, eram: *[32768]u8, addr: u16, val: u8) void {
+    pub fn writeRam(self: *MBC, eram: *[8192]u8, addr: u16, val: u8) void {
         switch (self.*) {
             .none => {},
             .mbc1 => |m| {

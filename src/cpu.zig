@@ -91,6 +91,7 @@ pub const CPU = struct {
         return opcodes[opcode](self, mmu);
     }
 
+
     pub fn fetch(self: *CPU, mmu: *MMU) u8 {
         const val = mmu.read(self.pc);
         if (!self.halt_bug) {

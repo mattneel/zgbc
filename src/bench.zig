@@ -4,8 +4,36 @@
 const std = @import("std");
 const GB = @import("gb.zig").GB;
 const simd_batch = @import("simd_batch.zig");
+const PPU = @import("ppu.zig").PPU;
 
 const BENCH_FRAMES = 10_000;
+
+/// Save frame buffer as PPM image
+fn saveScreenshot(frame: *const [160 * 144]u8, path: []const u8) !void {
+    const file = try std.fs.cwd().createFile(path, .{});
+    defer file.close();
+
+    // PPM header
+    try file.writeAll("P6\n160 144\n255\n");
+
+    // Convert 2-bit color indices to RGB
+    const palette = [4][3]u8{
+        .{ 0x9B, 0xBC, 0x0F }, // Lightest
+        .{ 0x8B, 0xAC, 0x0F }, // Light
+        .{ 0x30, 0x62, 0x30 }, // Dark
+        .{ 0x0F, 0x38, 0x0F }, // Darkest
+    };
+
+    var pixels: [160 * 144 * 3]u8 = undefined;
+    for (frame, 0..) |color_idx, i| {
+        const rgb = palette[color_idx];
+        pixels[i * 3 + 0] = rgb[0];
+        pixels[i * 3 + 1] = rgb[1];
+        pixels[i * 3 + 2] = rgb[2];
+    }
+
+    try file.writeAll(&pixels);
+}
 
 fn runFrames(gb: *GB, frames: usize) void {
     for (0..frames) |_| {
@@ -41,6 +69,10 @@ pub fn main() !void {
         try gb.loadRom(rom);
         gb.skipBootRom();
         for (0..1000) |_| gb.frame(); // warmup
+
+        // Save screenshot to verify PPU
+        try saveScreenshot(gb.getFrameBuffer(), "screenshot.ppm");
+        std.debug.print("Screenshot saved to screenshot.ppm\n", .{});
 
         var timer = try std.time.Timer.start();
         for (0..BENCH_FRAMES) |_| gb.frame();
@@ -89,4 +121,8 @@ pub fn main() !void {
 
     // SIMD ALU micro-benchmark
     try simd_batch.benchmarkALU();
+
+    // Struct sizes
+    std.debug.print("\n=== Struct sizes ===\n", .{});
+    std.debug.print("GB:  {} bytes\n", .{@sizeOf(GB)});
 }

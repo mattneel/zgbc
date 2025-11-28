@@ -8,7 +8,9 @@ pub const MMU = struct {
     rom: []const u8 = &.{},
     wram: [8192]u8 = [_]u8{0} ** 8192, // C000-DFFF
     hram: [127]u8 = [_]u8{0} ** 127, // FF80-FFFE
-    eram: [32768]u8 = [_]u8{0} ** 32768, // External RAM (max 32KB)
+    eram: [8192]u8 = [_]u8{0} ** 8192, // External RAM (8KB, enough for Pokemon)
+    vram: [8192]u8 = [_]u8{0} ** 8192, // 8000-9FFF
+    oam: [160]u8 = [_]u8{0} ** 160, // FE00-FE9F
 
     // I/O registers
     ie: u8 = 0, // FFFF - Interrupt Enable
@@ -54,8 +56,8 @@ pub const MMU = struct {
             // ROM Bank 1-N (switchable)
             0x4000...0x7FFF => self.mbc.readRom(self.rom, addr),
 
-            // VRAM - not emulated, return 0xFF
-            0x8000...0x9FFF => 0xFF,
+            // VRAM
+            0x8000...0x9FFF => self.vram[addr - 0x8000],
 
             // External RAM
             0xA000...0xBFFF => self.mbc.readRam(&self.eram, addr),
@@ -69,8 +71,8 @@ pub const MMU = struct {
             // Echo RAM (mirror of C000-DDFF)
             0xE000...0xFDFF => self.wram[addr - 0xE000],
 
-            // OAM - not emulated
-            0xFE00...0xFE9F => 0xFF,
+            // OAM
+            0xFE00...0xFE9F => self.oam[addr - 0xFE00],
 
             // Unusable
             0xFEA0...0xFEFF => 0xFF,
@@ -118,8 +120,8 @@ pub const MMU = struct {
             // ROM area - MBC register writes
             0x0000...0x7FFF => self.mbc.writeRegister(addr, val),
 
-            // VRAM - not emulated
-            0x8000...0x9FFF => {},
+            // VRAM
+            0x8000...0x9FFF => self.vram[addr - 0x8000] = val,
 
             // External RAM
             0xA000...0xBFFF => self.mbc.writeRam(&self.eram, addr, val),
@@ -133,8 +135,8 @@ pub const MMU = struct {
             // Echo RAM
             0xE000...0xFDFF => self.wram[addr - 0xE000] = val,
 
-            // OAM - not emulated
-            0xFE00...0xFE9F => {},
+            // OAM
+            0xFE00...0xFE9F => self.oam[addr - 0xFE00] = val,
 
             // Unusable
             0xFEA0...0xFEFF => {},
@@ -171,7 +173,7 @@ pub const MMU = struct {
                 const src_base: u16 = @as(u16, val) << 8;
                 for (0..160) |i| {
                     const src = src_base + @as(u16, @intCast(i));
-                    _ = self.read(src); // Would write to OAM, but we don't emulate it
+                    self.oam[i] = self.read(src);
                 }
             },
             0xFF47 => self.bgp = val,

@@ -4,6 +4,7 @@ const std = @import("std");
 const CPU = @import("cpu.zig").CPU;
 const MMU = @import("mmu.zig").MMU;
 const Timer = @import("timer.zig").Timer;
+const PPU = @import("ppu.zig").PPU;
 
 /// Cycles per frame (154 scanlines * 456 cycles)
 pub const CYCLES_PER_FRAME: u32 = 70224;
@@ -11,6 +12,7 @@ pub const CYCLES_PER_FRAME: u32 = 70224;
 pub const GB = struct {
     cpu: CPU = .{},
     mmu: MMU = .{},
+    ppu: PPU = .{},
 
     cycles: u64 = 0, // Total cycles elapsed
 
@@ -29,7 +31,18 @@ pub const GB = struct {
         );
 
         // Update PPU (LY counter, interrupts)
+        const prev_ly = self.mmu.ly;
         self.mmu.tickPpu(cycles);
+
+        // Render scanline when LY changes
+        if (self.mmu.ly != prev_ly) {
+            if (self.mmu.ly == 0) {
+                self.ppu.resetWindowLine();
+            }
+            if (prev_ly < 144) {
+                self.ppu.renderScanline(&self.mmu);
+            }
+        }
 
         self.cycles += cycles;
         return cycles;
@@ -52,6 +65,11 @@ pub const GB = struct {
     /// Get WRAM for observations
     pub fn getRam(self: *GB) []const u8 {
         return &self.mmu.wram;
+    }
+
+    /// Get frame buffer (160x144 2-bit color indices)
+    pub fn getFrameBuffer(self: *GB) *const [160 * 144]u8 {
+        return &self.ppu.frame_buffer;
     }
 
     /// Load a ROM

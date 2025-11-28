@@ -10,6 +10,8 @@ pub const Flags = @import("cpu.zig").Flags;
 pub const MMU = @import("mmu.zig").MMU;
 pub const Timer = @import("timer.zig").Timer;
 pub const MBC = @import("mbc.zig").MBC;
+pub const PPU = @import("ppu.zig").PPU;
+pub const PALETTE = @import("ppu.zig").PALETTE;
 
 // SIMD batch processing
 pub const simd = @import("simd_batch.zig");
