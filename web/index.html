@@ -28,6 +28,7 @@
         .system-gb { background: #9bbc0f; color: #0f380f; }
         .system-nes { background: #c84c4c; color: #fff; }
         .system-sms { background: #0070c0; color: #fff; }
+        .system-gen { background: #333; color: #fff; }
         #canvas-container {
             border: 4px solid #333;
             border-radius: 8px;
@@ -85,11 +86,11 @@
 </head>
 <body>
     <h1>libzetro <span id="system-badge" class="system-badge" style="display:none"></span></h1>
-    <p class="subtitle">Multi-System Emulator: Game Boy + NES + SMS</p>
+    <p class="subtitle">Multi-System Emulator: Game Boy + NES + SMS + Genesis</p>
 
     <div id="drop-zone" class="drop-zone">
         Drop ROM here or click to select<br>
-        <span class="supported">Supports: .gb .gbc .nes .sms</span>
+        <span class="supported">Supports: .gb .gbc .nes .sms .md .bin (Genesis)</span>
     </div>
 
     <div id="canvas-container" style="display:none">
@@ -98,7 +99,7 @@
 
     <div class="controls">
         <label for="rom">Load ROM</label>
-        <input type="file" id="rom" accept=".gb,.gbc,.nes,.sms">
+        <input type="file" id="rom" accept=".gb,.gbc,.nes,.sms,.md,.bin">
         <button id="mute">Sound: ON</button>
         <span id="fps">-- FPS</span>
     </div>
@@ -167,6 +168,19 @@
                 getAudioSamples: () => wasm.sms_getAudioSamples(),
                 label: 'SMS',
                 class: 'system-sms'
+            },
+            gen: {
+                width: 320,
+                height: 224,
+                scale: 2,
+                init: () => wasm.gen_init(),
+                loadRom: (len) => wasm.gen_loadRom(len),
+                frame: () => wasm.gen_frame(),
+                setInput: (b) => wasm.gen_setInput(b),
+                getFrame: () => wasm.gen_getFrame(),
+                getAudioSamples: () => wasm.gen_getAudioSamples(),
+                label: 'Genesis',
+                class: 'system-gen'
             }
         };
 
@@ -201,6 +215,17 @@
                 'ArrowRight': 3,
                 'z': 4, 'Z': 4,
                 'x': 5, 'X': 5
+            },
+            gen: {
+                // Genesis 3-button: Up=0, Down=1, Left=2, Right=3, A=4, B=5, C=6, Start=7
+                'ArrowUp': 0,
+                'ArrowDown': 1,
+                'ArrowLeft': 2,
+                'ArrowRight': 3,
+                'z': 4, 'Z': 4,  // A
+                'x': 5, 'X': 5,  // B
+                'c': 6, 'C': 6,  // C
+                'Enter': 7
             }
         };
 
@@ -299,6 +324,7 @@
             if (ext === 'gb' || ext === 'gbc') return 'gb';
             if (ext === 'nes') return 'nes';
             if (ext === 'sms' || ext === 'sg') return 'sms';
+            if (ext === 'md' || ext === 'bin' || ext === 'gen') return 'gen';
             return null;
         }
 

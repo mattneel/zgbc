@@ -89,7 +89,17 @@ pub const NES = struct {
             self.cpu.nmi_pending = true;
         }
 
+        // Check for mapper IRQ (MMC3, etc.)
+        if (self.mmu.mapper.pollIrq()) {
+            self.cpu.irq_pending = true;
+        }
+
         const cpu_cycles = self.cpu.step(&self.mmu);
+
+        // Update PPU mirroring from mapper (AxROM, MMC3 control it dynamically)
+        if (self.mmu.mapper.getMirroring()) |m| {
+            self.ppu.mirroring = m;
+        }
 
         // PPU runs 3x faster than CPU
         const ppu_cycles = @as(u32, cpu_cycles) * 3;
@@ -98,6 +108,13 @@ pub const NES = struct {
             // Sprite evaluation at end of visible scanline
             if (self.ppu.cycle == 257 and self.ppu.scanline >= 0 and self.ppu.scanline < 240) {
                 self.ppu.evaluateSprites();
+            }
+            // Clock mapper scanline counter (MMC3) at cycle 260 during visible scanlines
+            // This is when A12 rises during sprite fetches if using $1xxx for sprites
+            if (self.ppu.cycle == 260 and self.ppu.scanline >= 0 and self.ppu.scanline < 240) {
+                if (self.ppu.mask & 0x18 != 0) { // Rendering enabled
+                    self.mmu.mapper.clockScanline();
+                }
             }
         }
 

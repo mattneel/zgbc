@@ -149,6 +149,7 @@ pub const MMU = struct {
             1 => .{ .mmc1 = .{} },
             2 => .{ .uxrom = .{} },
             4 => .{ .mmc3 = .{} },
+            7 => .{ .axrom = .{} },
             else => .{ .nrom = .{} },
         };
 

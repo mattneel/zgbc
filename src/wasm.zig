@@ -14,6 +14,9 @@ const sms_mod = @import("sms/system.zig");
 const SMS = sms_mod.SMS;
 const SMSSaveState = sms_mod.SaveState;
 
+const genesis_mod = @import("genesis/system.zig");
+const Genesis = genesis_mod.Genesis;
+
 // =============================================================================
 // Shared resources
 // =============================================================================
@@ -341,4 +344,82 @@ export fn sms_getRamPtr() [*]const u8 {
 
 export fn sms_getRamSize() usize {
     return sms.getRam().len;
+}
+
+// =============================================================================
+// Genesis (Sega Mega Drive)
+// =============================================================================
+
+var gen: Genesis = .{};
+
+export fn gen_init() void {
+    gen = .{};
+}
+
+export fn gen_loadRom(len: usize) bool {
+    if (len > rom_storage.len) return false;
+    gen.loadRom(rom_storage[0..len]);
+    return true;
+}
+
+export fn gen_frame() void {
+    gen.frame();
+}
+
+export fn gen_step() u32 {
+    return gen.step();
+}
+
+export fn gen_setInput(buttons: u8) void {
+    gen.setInput(buttons);
+}
+
+export fn gen_getFrame() [*]u32 {
+    return @constCast(gen.getFrameBuffer());
+}
+
+export fn gen_getFrameWidth() u32 {
+    return 320;
+}
+
+export fn gen_getFrameHeight() u32 {
+    return 224;
+}
+
+export fn gen_getScanline() u16 {
+    return gen.vdp.scanline;
+}
+
+export fn gen_isVBlank() bool {
+    return gen.vdp.scanline >= 224;
+}
+
+export fn gen_getAudioSamples() usize {
+    return gen.getAudioSamples(&audio_buffer);
+}
+
+export fn gen_read(addr: u32) u8 {
+    return gen.read(addr);
+}
+
+export fn gen_write(addr: u32, val: u8) void {
+    gen.write(addr, val);
+}
+
+// Battery saves (SRAM)
+export fn gen_getSavePtr() [*]u8 {
+    return &gen.bus.sram;
+}
+
+export fn gen_getSaveSize() usize {
+    return gen.bus.sram.len;
+}
+
+// RAM access for RL
+export fn gen_getRamPtr() [*]const u8 {
+    return gen.getRam().ptr;
+}
+
+export fn gen_getRamSize() usize {
+    return gen.getRam().len;
 }

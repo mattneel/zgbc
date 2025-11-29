@@ -2,11 +2,13 @@
 //! Handles ROM banking and other cartridge hardware.
 
 const std = @import("std");
+const PPU = @import("ppu.zig").PPU;
 
 pub const Mapper = union(enum) {
     nrom: NROM,
     mmc1: MMC1,
     uxrom: UxROM,
+    axrom: AxROM,
     mmc3: MMC3,
 
     pub fn readPrg(self: *Mapper, prg: []const u8, addr: u16) u8 {
@@ -14,6 +16,7 @@ pub const Mapper = union(enum) {
             .nrom => |*m| m.readPrg(prg, addr),
             .mmc1 => |*m| m.readPrg(prg, addr),
             .uxrom => |*m| m.readPrg(prg, addr),
+            .axrom => |*m| m.readPrg(prg, addr),
             .mmc3 => |*m| m.readPrg(prg, addr),
         };
     }
@@ -23,6 +26,7 @@ pub const Mapper = union(enum) {
             .nrom => {},
             .mmc1 => |*m| m.write(addr, val),
             .uxrom => |*m| m.write(addr, val),
+            .axrom => |*m| m.write(addr, val),
             .mmc3 => |*m| m.write(addr, val),
         }
     }
@@ -32,8 +36,42 @@ pub const Mapper = union(enum) {
             .nrom => |*m| m.readChr(chr, addr),
             .mmc1 => |*m| m.readChr(chr, addr),
             .uxrom => |*m| m.readChr(chr, addr),
+            .axrom => |*m| m.readChr(chr, addr),
             .mmc3 => |*m| m.readChr(chr, addr),
         };
+    }
+
+    /// Get mirroring mode (for mappers that control it)
+    pub fn getMirroring(self: *Mapper) ?PPU.Mirroring {
+        return switch (self.*) {
+            .axrom => |m| if (m.mirroring == 0) .single0 else .single1,
+            .mmc3 => |m| if (m.mirroring == 0) .vertical else .horizontal,
+            else => null,
+        };
+    }
+
+    /// Clock scanline counter (for MMC3 IRQ)
+    pub fn clockScanline(self: *Mapper) void {
+        switch (self.*) {
+            .mmc3 => |*m| m.scanline(),
+            else => {},
+        }
+    }
+
+    /// Check if mapper has pending IRQ
+    pub fn pollIrq(self: *Mapper) bool {
+        return switch (self.*) {
+            .mmc3 => |m| m.irq_pending,
+            else => false,
+        };
+    }
+
+    /// Acknowledge mapper IRQ
+    pub fn acknowledgeIrq(self: *Mapper) void {
+        switch (self.*) {
+            .mmc3 => |*m| m.irq_pending = false,
+            else => {},
+        }
     }
 };
 
@@ -182,6 +220,37 @@ pub const UxROM = struct {
     pub fn write(self: *UxROM, addr: u16, val: u8) void {
         _ = addr;
         self.bank = val & 0x0F;
+    }
+};
+
+/// AxROM (Mapper 7) - 32KB PRG switching + single-screen mirroring
+/// Used by: Battletoads, Marble Madness, etc.
+pub const AxROM = struct {
+    bank: u8 = 0,
+    mirroring: u1 = 0, // 0 = single-screen lower, 1 = single-screen upper
+
+    pub fn readPrg(self: *AxROM, prg: []const u8, addr: u16) u8 {
+        if (prg.len == 0) return 0;
+        const bank_count = prg.len / 0x8000;
+
+        // 32KB bank switching
+        const bank: usize = self.bank & 0x07;
+        const actual_bank = if (bank_count > 0) bank % bank_count else 0;
+        const offset = addr - 0x8000;
+        const final_addr = actual_bank * 0x8000 + offset;
+        return if (final_addr < prg.len) prg[final_addr] else 0;
+    }
+
+    pub fn readChr(self: *AxROM, chr: []const u8, addr: u16) u8 {
+        _ = self;
+        // AxROM uses CHR RAM
+        if (addr < chr.len) return chr[addr] else return 0;
+    }
+
+    pub fn write(self: *AxROM, addr: u16, val: u8) void {
+        _ = addr;
+        self.bank = val & 0x07;
+        self.mirroring = @truncate((val >> 4) & 1);
     }
 };
 

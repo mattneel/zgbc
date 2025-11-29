@@ -182,7 +182,7 @@ pub const PPU = struct {
 
             for (0..self.sprite_count) |i| {
                 const base = i * 4;
-                const sprite_x = self.secondary_oam[base + 3];
+                const sprite_x: u16 = self.secondary_oam[base + 3];
                 if (px < sprite_x or px >= sprite_x + 8) continue;
 
                 const sprite_y = self.secondary_oam[base];

@@ -26,6 +26,19 @@ pub const sms = struct {
 };
 pub const SMS = sms.SMS;
 
+// Genesis (Sega Mega Drive)
+pub const genesis = struct {
+    pub const system = @import("genesis/system.zig");
+    pub const cpu = @import("genesis/cpu.zig");
+    pub const vdp = @import("genesis/vdp.zig");
+    pub const ym2612 = @import("genesis/ym2612.zig");
+    pub const psg = @import("genesis/psg.zig");
+    pub const bus = @import("genesis/bus.zig");
+    pub const z80 = @import("genesis/z80.zig");
+    pub const Genesis = system.Genesis;
+};
+pub const Genesis = genesis.Genesis;
+
 // Re-export GB internals for backwards compatibility
 pub const CPU = @import("gb/cpu.zig").CPU;
 pub const Flags = @import("gb/cpu.zig").Flags;
