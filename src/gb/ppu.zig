@@ -228,6 +228,6 @@ pub const PPU = struct {
 };
 
 test "ppu init" {
-    var ppu = PPU{};
+    const ppu = PPU{};
     _ = ppu.frame_buffer[0];
 }
