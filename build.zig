@@ -137,6 +137,16 @@ pub fn build(b: *std.Build) void {
         }),
     });
 
+    // SMS ZEXALL Z80 test
+    const zexall_tests = b.addTest(.{
+        .root_module = b.createModule(.{
+            .root_source_file = b.path("test/zexall_test.zig"),
+            .target = target,
+            .optimize = .ReleaseFast, // Run fast for long test
+            .imports = &.{.{ .name = "sms", .module = zgbc_mod }},
+        }),
+    });
+
     const test_step = b.step("test", "Run unit tests");
     test_step.dependOn(&b.addRunArtifact(lib_tests).step);
 
@@ -148,4 +158,31 @@ pub fn build(b: *std.Build) void {
 
     const pokemon_step = b.step("test-pokemon", "Run Pokemon Red boot test");
     pokemon_step.dependOn(&b.addRunArtifact(pokemon_tests).step);
+
+    const zexall_step = b.step("test-zexall", "Run ZEXALL Z80 instruction test");
+    zexall_step.dependOn(&b.addRunArtifact(zexall_tests).step);
+
+    // SMS debug test
+    const sms_debug = b.addTest(.{
+        .root_module = b.createModule(.{
+            .root_source_file = b.path("test/sms_debug.zig"),
+            .target = target,
+            .optimize = optimize,
+            .imports = &.{.{ .name = "sms", .module = zgbc_mod }},
+        }),
+    });
+    const sms_debug_step = b.step("test-sms", "Debug SMS boot");
+    sms_debug_step.dependOn(&b.addRunArtifact(sms_debug).step);
+
+    // SMS visual test
+    const sms_visual = b.addTest(.{
+        .root_module = b.createModule(.{
+            .root_source_file = b.path("test/sms_visual_test.zig"),
+            .target = target,
+            .optimize = optimize,
+            .imports = &.{.{ .name = "sms", .module = zgbc_mod }},
+        }),
+    });
+    const sms_visual_step = b.step("test-sms-visual", "SMS visual rendering test");
+    sms_visual_step.dependOn(&b.addRunArtifact(sms_visual).step);
 }

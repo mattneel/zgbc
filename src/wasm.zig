@@ -1,5 +1,5 @@
 //! WASM bindings for browser deployment
-//! Multi-system emulator: Game Boy and NES
+//! Multi-system emulator: Game Boy, NES, and SMS
 
 const gb_mod = @import("gb/system.zig");
 const GB = gb_mod.GB;
@@ -9,6 +9,10 @@ const gb_ppu = @import("gb/ppu.zig");
 const nes_mod = @import("nes/system.zig");
 const NES = nes_mod.NES;
 const NESSaveState = nes_mod.SaveState;
+
+const sms_mod = @import("sms/system.zig");
+const SMS = sms_mod.SMS;
+const SMSSaveState = sms_mod.SaveState;
 
 // =============================================================================
 // Shared resources
@@ -235,4 +239,106 @@ export fn nes_getRamPtr() [*]const u8 {
 
 export fn nes_getRamSize() usize {
     return nes.getRam().len;
+}
+
+// =============================================================================
+// SMS (Sega Master System)
+// =============================================================================
+
+var sms: SMS = .{};
+var sms_save_state: SMSSaveState = undefined;
+
+export fn sms_init() void {
+    sms = .{};
+}
+
+export fn sms_loadRom(len: usize) bool {
+    if (len > rom_storage.len) return false;
+    sms.loadRom(rom_storage[0..len]);
+    return true;
+}
+
+export fn sms_frame() void {
+    sms.frame();
+}
+
+export fn sms_step() u8 {
+    return sms.step();
+}
+
+export fn sms_setInput(buttons: u8) void {
+    sms.setInput(buttons);
+}
+
+export fn sms_getFrame() [*]u32 {
+    return @constCast(sms.getFrameBuffer());
+}
+
+export fn sms_getFrameWidth() u32 {
+    return 256;
+}
+
+export fn sms_getFrameHeight() u32 {
+    return sms.getScreenHeight();
+}
+
+export fn sms_getScanline() u16 {
+    return sms.vdp.scanline;
+}
+
+export fn sms_isVBlank() bool {
+    return sms.vdp.scanline >= sms.vdp.screen_height;
+}
+
+export fn sms_getAudioSamples() usize {
+    return sms.getAudioSamples(&audio_buffer);
+}
+
+export fn sms_setRenderGraphics(enabled: bool) void {
+    sms.render_graphics = enabled;
+}
+
+export fn sms_setRenderAudio(enabled: bool) void {
+    sms.render_audio = enabled;
+}
+
+export fn sms_read(addr: u16) u8 {
+    return sms.read(addr);
+}
+
+export fn sms_write(addr: u16, val: u8) void {
+    sms.write(addr, val);
+}
+
+// Battery saves
+export fn sms_getSavePtr() [*]u8 {
+    return &sms.bus.cart_ram;
+}
+
+export fn sms_getSaveSize() usize {
+    return sms.bus.cart_ram.len;
+}
+
+// Save states
+export fn sms_saveStateSize() usize {
+    return @sizeOf(SMSSaveState);
+}
+
+export fn sms_saveState() [*]u8 {
+    sms_save_state = sms.saveState();
+    return @ptrCast(&sms_save_state);
+}
+
+export fn sms_loadState(ptr: [*]const u8) void {
+    const state: *const SMSSaveState = @ptrCast(@alignCast(ptr));
+    sms.loadState(state.*);
+}
+
+// RAM access for RL
+export fn sms_getRamPtr() [*]const u8 {
+    return sms.getRam().ptr;
+}
+
+export fn sms_getRamSize() usize {
+    return sms.getRam().len;
 }

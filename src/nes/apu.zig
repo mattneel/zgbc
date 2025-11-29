@@ -25,6 +25,7 @@ pub const APU = struct {
     sample_write_idx: usize = 0,
     sample_read_idx: usize = 0,
     cycle_counter: u32 = 0,
+    half_cycle: bool = false,
 
     const SAMPLE_RATE = 44100;
     const CPU_FREQ = 1789773;
@@ -40,10 +41,13 @@ pub const APU = struct {
         // Triangle ticks every CPU cycle
         self.triangle.tickTimer();
 
-        // Others tick every other cycle
-        self.pulse1.tickTimer();
-        self.pulse2.tickTimer();
-        self.noise.tickTimer();
+        // Pulse and noise tick every OTHER cycle (half CPU rate)
+        self.half_cycle = !self.half_cycle;
+        if (self.half_cycle) {
+            self.pulse1.tickTimer();
+            self.pulse2.tickTimer();
+            self.noise.tickTimer();
+        }
 
         // Sample output
         self.cycle_counter += 1;
@@ -60,11 +64,12 @@ pub const APU = struct {
         const noise: f32 = @floatFromInt(self.noise.output());
         const dmc: f32 = @floatFromInt(self.dmc.output);
 
-        // Mix using NES nonlinear mixing
-        const pulse_out: f32 = if (p1 + p2 > 0) 95.88 / (100.0 / (p1 + p2) + 8128.0) else 0;
-        const tnd_out: f32 = if (tri + noise + dmc > 0) 159.79 / (100.0 / (tri / 8227.0 + noise / 12241.0 + dmc / 22638.0) + 1.0) else 0;
+        // Mix using NES nonlinear mixing (formulas from nesdev wiki)
+        const pulse_out: f32 = if (p1 + p2 > 0) 95.88 / (8128.0 / (p1 + p2) + 100.0) else 0;
+        const tnd_out: f32 = if (tri + noise + dmc > 0) 159.79 / (1.0 / (tri / 8227.0 + noise / 12241.0 + dmc / 22638.0) + 100.0) else 0;
 
-        const sample: i16 = @intFromFloat((pulse_out + tnd_out) * 32767.0);
+        // Scale to full 16-bit range with volume boost
+        const sample: i16 = @intFromFloat(std.math.clamp((pulse_out + tnd_out) * 49152.0, -32768.0, 32767.0));
 
         // Output stereo (same on both channels)
         if (self.sample_write_idx + 1 < self.sample_buffer.len) {

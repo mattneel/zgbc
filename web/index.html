@@ -27,6 +27,7 @@
         }
         .system-gb { background: #9bbc0f; color: #0f380f; }
         .system-nes { background: #c84c4c; color: #fff; }
+        .system-sms { background: #0070c0; color: #fff; }
         #canvas-container {
             border: 4px solid #333;
             border-radius: 8px;
@@ -84,11 +85,11 @@
 </head>
 <body>
     <h1>libzetro <span id="system-badge" class="system-badge" style="display:none"></span></h1>
-    <p class="subtitle">Multi-System Emulator: Game Boy + NES</p>
+    <p class="subtitle">Multi-System Emulator: Game Boy + NES + SMS</p>
 
     <div id="drop-zone" class="drop-zone">
         Drop ROM here or click to select<br>
-        <span class="supported">Supports: .gb .gbc .nes</span>
+        <span class="supported">Supports: .gb .gbc .nes .sms</span>
     </div>
 
     <div id="canvas-container" style="display:none">
@@ -97,7 +98,7 @@
 
     <div class="controls">
         <label for="rom">Load ROM</label>
-        <input type="file" id="rom" accept=".gb,.gbc,.nes">
+        <input type="file" id="rom" accept=".gb,.gbc,.nes,.sms">
         <button id="mute">Sound: ON</button>
         <span id="fps">-- FPS</span>
     </div>
@@ -153,11 +154,25 @@
                 getAudioSamples: () => wasm.nes_getAudioSamples(),
                 label: 'NES',
                 class: 'system-nes'
+            },
+            sms: {
+                width: 256,
+                height: 192,
+                scale: 2,
+                init: () => wasm.sms_init(),
+                loadRom: (len) => wasm.sms_loadRom(len),
+                frame: () => wasm.sms_frame(),
+                setInput: (b) => wasm.sms_setInput(b),
+                getFrame: () => wasm.sms_getFrame(),
+                getAudioSamples: () => wasm.sms_getAudioSamples(),
+                label: 'SMS',
+                class: 'system-sms'
             }
         };
 
         // GB:  A=0, B=1, Select=2, Start=3, Right=4, Left=5, Up=6, Down=7
         // NES: A=0, B=1, Select=2, Start=3, Up=4, Down=5, Left=6, Right=7
+        // SMS: Up=0, Down=1, Left=2, Right=3, B1=4, B2=5
         const keyMaps = {
             gb: {
                 'z': 0, 'Z': 0,
@@ -178,6 +193,14 @@
                 'ArrowDown': 5,
                 'ArrowLeft': 6,
                 'ArrowRight': 7
+            },
+            sms: {
+                'ArrowUp': 0,
+                'ArrowDown': 1,
+                'ArrowLeft': 2,
+                'ArrowRight': 3,
+                'z': 4, 'Z': 4,
+                'x': 5, 'X': 5
             }
         };
 
@@ -223,7 +246,7 @@
         });
 
         async function init() {
-            const response = await fetch('zgbc.wasm');
+            const response = await fetch('zgbc.wasm?v=' + Date.now());
             const bytes = await response.arrayBuffer();
             const { instance } = await WebAssembly.instantiate(bytes, {});
             wasm = instance.exports;
@@ -275,6 +298,7 @@
             const ext = filename.toLowerCase().split('.').pop();
             if (ext === 'gb' || ext === 'gbc') return 'gb';
             if (ext === 'nes') return 'nes';
+            if (ext === 'sms' || ext === 'sg') return 'sms';
             return null;
         }
 
@@ -283,7 +307,7 @@
 
             const system = detectSystem(file.name);
             if (!system) {
-                alert('Unsupported file type. Use .gb, .gbc, or .nes');
+                alert('Unsupported file type. Use .gb, .gbc, .nes, or .sms');
                 return;
             }
 

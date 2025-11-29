@@ -15,6 +15,17 @@ pub const SaveState = gb.SaveState;
 pub const nes = @import("nes/system.zig");
 pub const NES = nes.NES;
 
+// SMS (Sega Master System)
+pub const sms = struct {
+    pub const system = @import("sms/system.zig");
+    pub const cpu = @import("sms/cpu.zig");
+    pub const vdp = @import("sms/vdp.zig");
+    pub const psg = @import("sms/psg.zig");
+    pub const bus = @import("sms/bus.zig");
+    pub const SMS = system.SMS;
+};
+pub const SMS = sms.SMS;
+
 // Re-export GB internals for backwards compatibility
 pub const CPU = @import("gb/cpu.zig").CPU;
 pub const Flags = @import("gb/cpu.zig").Flags;

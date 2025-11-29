@@ -43,6 +43,12 @@ pub const PPU = struct {
     frame: u64 = 0,
     odd_frame: bool = false,
 
+    // Captured scroll state at start of each scanline (for rendering)
+    scanline_coarse_x: u5 = 0,
+    scanline_fine_y: u3 = 0,
+    scanline_coarse_y: u5 = 0,
+    scanline_nt: u2 = 0,
+
     // Output
     frame_buffer: [256 * 240]u32 = [_]u32{0} ** (256 * 240),
 
@@ -66,25 +72,18 @@ pub const PPU = struct {
 
         // Visible scanlines
         if (self.scanline >= 0 and self.scanline < 240) {
+            // Capture scroll state at start of visible portion
+            if (self.cycle == 0) {
+                self.captureScrollState();
+            }
             if (self.cycle >= 1 and self.cycle <= 256) {
                 self.renderPixel();
-                // Increment coarse X every 8 pixels
-                if (self.cycle & 7 == 0 and self.renderingEnabled()) {
-                    self.incrementX();
-                }
             }
             if (self.cycle == 256 and self.renderingEnabled()) {
                 self.incrementY();
             }
             if (self.cycle == 257 and self.renderingEnabled()) {
                 self.copyHorizontal();
-            }
-        }
-
-        // Also increment during pre-render for timing
-        if (self.scanline == -1 and self.cycle >= 1 and self.cycle <= 256) {
-            if (self.cycle & 7 == 0 and self.renderingEnabled()) {
-                self.incrementX();
             }
         }
 
@@ -118,6 +117,14 @@ pub const PPU = struct {
         return self.mask & 0x18 != 0;
     }
 
+    fn captureScrollState(self: *PPU) void {
+        // Capture scroll position from v register at start of scanline
+        self.scanline_coarse_x = @truncate(self.v & 0x1F);
+        self.scanline_coarse_y = @truncate((self.v >> 5) & 0x1F);
+        self.scanline_nt = @truncate((self.v >> 10) & 0x03);
+        self.scanline_fine_y = @truncate(self.v >> 12);
+    }
+
     fn renderPixel(self: *PPU) void {
         const px = self.cycle - 1;
         const py: u16 = @intCast(self.scanline);
@@ -125,16 +132,22 @@ pub const PPU = struct {
         var bg_color: u8 = 0;
         var bg_opaque = false;
 
-        // Background - use v register for tile coordinates
+        // Background
         if (self.mask & 0x08 != 0 and (self.mask & 0x02 != 0 or px >= 8)) {
-            // Fine X comes from x register, adjusted by pixel position within tile
-            const fine_x: u3 = @truncate((px + self.x) & 7);
+            // Calculate total X position: base scroll + pixel position
+            // fine_x (3 bits) + coarse_x*8 (8 bits) + px gives total X
+            const total_x: u16 = @as(u16, self.x) + @as(u16, self.scanline_coarse_x) * 8 + px;
 
-            // Coarse X and Y from v register
-            const coarse_x = self.v & 0x1F;
-            const coarse_y = (self.v >> 5) & 0x1F;
-            const nt_select = (self.v >> 10) & 0x03;
-            const fine_y: u3 = @truncate(self.v >> 12);
+            // Fine X is the low 3 bits of total position
+            const fine_x: u3 = @truncate(total_x);
+            // Coarse X is bits 3-7 (0-31), wrapping within nametable pair
+            const coarse_x: u5 = @truncate(total_x >> 3);
+            // Nametable X bit flips when coarse_x overflows from 31 to 0
+            const nt_x: u1 = @truncate((total_x >> 8) & 1);
+            const nt_select = (self.scanline_nt & 0x02) | (((self.scanline_nt & 1) ^ nt_x));
+
+            const fine_y = self.scanline_fine_y;
+            const coarse_y = self.scanline_coarse_y;
 
             const nt_addr = 0x2000 | (@as(u16, nt_select) << 10) | (@as(u16, coarse_y) << 5) | coarse_x;
             const tile_idx = self.readVram(nt_addr);
@@ -149,9 +162,9 @@ pub const PPU = struct {
             const color_idx = (((hi >> bit) & 1) << 1) | ((lo >> bit) & 1);
 
             if (color_idx != 0) {
-                const attr_addr = 0x23C0 | (@as(u16, nt_select) << 10) | ((coarse_y >> 2) << 3) | (coarse_x >> 2);
+                const attr_addr = 0x23C0 | (@as(u16, nt_select) << 10) | ((@as(u16, coarse_y) >> 2) << 3) | (@as(u16, coarse_x) >> 2);
                 const attr = self.readVram(attr_addr);
-                const shift: u3 = @intCast(((coarse_y & 2) << 1) | (coarse_x & 2));
+                const shift: u3 = @truncate(((coarse_y & 2) << 1) | (coarse_x & 2));
                 const palette_idx = (attr >> shift) & 0x03;
 
                 bg_color = self.palette[@as(usize, palette_idx) * 4 + color_idx];
