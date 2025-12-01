@@ -596,7 +596,7 @@ fn detectFromExtension(path: []const u8) ?SystemKind {
 }
 
 fn readRom(allocator: Allocator, path: []const u8) ![]u8 {
-    return try std.fs.cwd().readFileAlloc(path, allocator, std.Io.Limit.limited(64 * 1024 * 1024));
+    return try std.fs.cwd().readFileAlloc(allocator, path, 64 * 1024 * 1024);
 }
 
 fn allocCString(allocator: Allocator, text: []const u8) ![:0]u8 {

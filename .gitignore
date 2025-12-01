@@ -3,3 +3,4 @@ zig-out/
 roms/
 test/pokered.gb
 *.ppm
+*.pyc

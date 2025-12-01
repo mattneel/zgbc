@@ -77,6 +77,19 @@ pub fn main() !void {
     const full_ns = timer_full.read();
     const full_fps = @as(f64, BENCH_FRAMES) / (@as(f64, @floatFromInt(full_ns)) / 1e9);
 
+    // Benchmark PPU-only (no APU) - RL training mode
+    var gb_ppu_only = GB{};
+    gb_ppu_only.render_graphics = true; // PPU enabled for pixel observations
+    gb_ppu_only.render_audio = false; // APU disabled
+    try gb_ppu_only.loadRom(rom);
+    gb_ppu_only.skipBootRom();
+    for (0..1000) |_| gb_ppu_only.frame();
+
+    var timer_ppu_only = try std.time.Timer.start();
+    for (0..BENCH_FRAMES) |_| gb_ppu_only.frame();
+    const ppu_only_ns = timer_ppu_only.read();
+    const ppu_only_fps = @as(f64, BENCH_FRAMES) / (@as(f64, @floatFromInt(ppu_only_ns)) / 1e9);
+
     // Benchmark headless (no graphics, no audio)
     var gb_headless = GB{};
     gb_headless.render_graphics = false;
@@ -91,8 +104,9 @@ pub fn main() !void {
     const headless_fps = @as(f64, BENCH_FRAMES) / (@as(f64, @floatFromInt(headless_ns)) / 1e9);
 
     std.debug.print("\nSingle-thread performance:\n", .{});
-    std.debug.print("  Full (PPU+APU): {d:>8.0} FPS\n", .{full_fps});
-    std.debug.print("  Headless:       {d:>8.0} FPS ({d:.1}x faster)\n", .{ headless_fps, headless_fps / full_fps });
+    std.debug.print("  Full (PPU+APU):    {d:>8.0} FPS\n", .{full_fps});
+    std.debug.print("  PPU-only (no APU): {d:>8.0} FPS ({d:.1}x faster)  <-- RL-relevant\n", .{ ppu_only_fps, ppu_only_fps / full_fps });
+    std.debug.print("  Headless:          {d:>8.0} FPS ({d:.1}x faster)\n", .{ headless_fps, headless_fps / full_fps });
 
     // Multi-threaded headless scaling
     std.debug.print("\nHeadless multi-threaded scaling:\n", .{});

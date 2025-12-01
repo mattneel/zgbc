@@ -54,6 +54,14 @@ export fn zgbc_frame(handle: *zgbc_t) callconv(.c) void {
     toGB(handle).frame();
 }
 
+/// Run multiple frames (optimized batch execution)
+export fn zgbc_run_frames(handle: *zgbc_t, count: usize) callconv(.c) void {
+    const gb = toGB(handle);
+    for (0..count) |_| {
+        gb.frame();
+    }
+}
+
 /// Run one CPU step, returns cycles consumed
 export fn zgbc_step(handle: *zgbc_t) callconv(.c) u8 {
     return toGB(handle).step();
@@ -134,6 +142,15 @@ export fn zgbc_get_wram(handle: *zgbc_t) callconv(.c) [*]const u8 {
 /// Get WRAM size
 export fn zgbc_get_wram_size() callconv(.c) usize {
     return 8192;
+}
+
+/// Copy full 64KB address space into buffer
+export fn zgbc_copy_memory(handle: *zgbc_t, out: [*]u8, len: usize) callconv(.c) void {
+    const gb = toGB(handle);
+    const size = @min(len, 0x10000);
+    for (0..size) |i| {
+        out[i] = gb.mmu.read(@intCast(i));
+    }
 }
 
 // =========================================================

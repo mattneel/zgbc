@@ -58,6 +58,9 @@ bool zgbc_load_rom(zgbc_t* gb, const uint8_t* data, size_t len);
 /* Run one frame (~70224 cycles) */
 void zgbc_frame(zgbc_t* gb);
 
+/* Run multiple frames (optimized batch execution) */
+void zgbc_run_frames(zgbc_t* gb, size_t count);
+
 /* Run one CPU step, returns cycles consumed */
 uint8_t zgbc_step(zgbc_t* gb);
 
@@ -110,6 +113,9 @@ const uint8_t* zgbc_get_wram(zgbc_t* gb);
 
 /* Get WRAM size (always 8192) */
 size_t zgbc_get_wram_size(void);
+
+/* Copy full 64KB address space into buffer */
+void zgbc_copy_memory(zgbc_t* gb, uint8_t* out, size_t len);
 
 /* =========================================================
  * Battery saves (SRAM)
