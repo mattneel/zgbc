@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Benchmark zgbc native environment vs pokegym PyBoy compatibility layer.
+Benchmark zgbc native environment vs PyBoy.
 
 Usage:
     python benchmarks/env_benchmark.py roms/pokered.gb
@@ -42,36 +42,6 @@ def benchmark_native_env(rom_path: Path, steps: int = DEFAULT_STEPS) -> float | 
         return frames / elapsed
     except Exception as e:
         print(f"Native env error: {e}")
-        import traceback
-        traceback.print_exc()
-        return None
-
-
-def benchmark_pokegym_compat(rom_path: Path, steps: int = DEFAULT_STEPS) -> float | None:
-    """Benchmark pokegym PyBoy compatibility wrapper."""
-    try:
-        bindings_path = Path(__file__).parent.parent / "bindings" / "python" / "src"
-        if bindings_path.exists():
-            sys.path.insert(0, str(bindings_path))
-        
-        from zgbc.pokegym import make_env, run_action_on_emulator, ACTIONS
-    except ImportError as e:
-        print(f"Pokegym compat not available: {e}")
-        return None
-    
-    try:
-        game, screen = make_env(rom_path)
-        
-        start = time.perf_counter()
-        for _ in range(steps):
-            action = ACTIONS[hash(time.time()) % len(ACTIONS)]
-            run_action_on_emulator(game, screen, action, frame_skip=FRAME_SKIP)
-        elapsed = time.perf_counter() - start
-        
-        frames = steps * FRAME_SKIP
-        return frames / elapsed
-    except Exception as e:
-        print(f"Pokegym compat error: {e}")
         import traceback
         traceback.print_exc()
         return None
@@ -159,9 +129,6 @@ def main():
     print("Benchmarking native PokemonRedEnv...")
     native_fps = benchmark_native_env(args.rom, steps)
     
-    print("Benchmarking pokegym compat layer...")
-    compat_fps = benchmark_pokegym_compat(args.rom, steps)
-    
     print()
     print("=" * 55)
     print("Results (frames per second):")
@@ -184,13 +151,6 @@ def main():
         else:
             print()
     
-    if compat_fps:
-        print(f"  Pokegym compat layer:     {compat_fps:>10,.0f} FPS", end="")
-        if pyboy_fps:
-            print(f"  ({compat_fps/pyboy_fps:.1f}x PyBoy)")
-        else:
-            print()
-    
     if native_fps and pyboy_fps:
         print()
         print(f"  => zgbc native env is {native_fps/pyboy_fps:.1f}x faster than PyBoy for RL training")
@@ -198,4 +158,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-

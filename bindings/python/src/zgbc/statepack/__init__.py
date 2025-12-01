@@ -1,1 +1,0 @@
-"""Bundled Pokegym save states."""
