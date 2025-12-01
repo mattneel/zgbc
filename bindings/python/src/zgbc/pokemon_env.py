@@ -66,11 +66,10 @@ class PokemonRedEnv(gym.Env):
     Native zgbc Pokemon Red environment.
     
     Optimized for RL training:
-    - PPU always enabled (need pixels for observations)
+    - PPU only renders final frame per step
     - APU always disabled (no audio overhead)
-    - Direct memory reads (no proxy objects)
-    - Minimal frame buffer copies
-    - Pre-allocated numpy arrays
+    - Single RAM snapshot per step (not per-address reads)
+    - Pre-allocated numpy arrays (zero alloc in hot path)
     """
     
     metadata = {"render_modes": ["rgb_array", "human"], "render_fps": 60}
@@ -103,9 +102,11 @@ class PokemonRedEnv(gym.Env):
             self._initial_state = self.state_path.read_bytes()
             self._gb.load_state(self._initial_state)
         
-        # Pre-allocate frame buffer (reused every step)
+        # Pre-allocate buffers (reused every step - zero allocation in hot path)
         self._frame_rgba = np.zeros((FRAME_HEIGHT, FRAME_WIDTH, 4), dtype=np.uint8)
         self._frame_rgb = self._frame_rgba[:, :, :3]  # View, no copy
+        self._ram_buf = (ctypes.c_uint8 * 0x10000)()  # 64KB RAM snapshot buffer
+        self._ram = np.frombuffer(self._ram_buf, dtype=np.uint8)  # numpy view
         
         # Spaces
         self.action_space = spaces.Discrete(len(ACTIONS))
@@ -145,13 +146,14 @@ class PokemonRedEnv(gym.Env):
         self._visited_maps.clear()
         self._visited_coords.clear()
         
-        # Capture initial state
-        self._update_frame()
-        self._prev_map = self._read(MAP_ID)
-        self._prev_x = self._read(PLAYER_X)
-        self._prev_y = self._read(PLAYER_Y)
-        self._prev_badges = self._read(BADGES)
-        self._prev_party_level = self._read(PARTY_LEVEL_1)
+        # Snapshot RAM + frame once
+        self._snapshot()
+        
+        self._prev_map = int(self._ram[MAP_ID])
+        self._prev_x = int(self._ram[PLAYER_X])
+        self._prev_y = int(self._ram[PLAYER_Y])
+        self._prev_badges = int(self._ram[BADGES])
+        self._prev_party_level = int(self._ram[PARTY_LEVEL_1])
         
         self._visited_maps.add(self._prev_map)
         self._visited_coords.add((self._prev_map, self._prev_x, self._prev_y))
@@ -172,15 +174,17 @@ class PokemonRedEnv(gym.Env):
         
         self._step_count += 1
         
-        # Get new state
-        self._update_frame()
-        cur_map = self._read(MAP_ID)
-        cur_x = self._read(PLAYER_X)
-        cur_y = self._read(PLAYER_Y)
-        cur_badges = self._read(BADGES)
-        cur_party_level = self._read(PARTY_LEVEL_1)
+        # Single snapshot: RAM + frame (2 FFI calls total)
+        self._snapshot()
         
-        # Reward calculation
+        # All reads are now pure numpy array indexing - no FFI
+        cur_map = int(self._ram[MAP_ID])
+        cur_x = int(self._ram[PLAYER_X])
+        cur_y = int(self._ram[PLAYER_Y])
+        cur_badges = int(self._ram[BADGES])
+        cur_party_level = int(self._ram[PARTY_LEVEL_1])
+        
+        # Reward calculation (all from cached RAM - zero FFI)
         reward = 0.0
         
         # Exploration reward
@@ -216,6 +220,17 @@ class PokemonRedEnv(gym.Env):
         
         return self._frame_rgb.copy(), reward, terminated, truncated, self._get_info()
     
+    def _snapshot(self) -> None:
+        """Snapshot RAM and frame in one go. All subsequent reads use cached data."""
+        # 1 FFI call for RAM (instead of N calls for N addresses)
+        self._gb.snapshot_memory_into(self._ram_buf)
+        # 1 FFI call for frame
+        rgba_bytes = self._gb.get_frame_rgba()
+        np.copyto(
+            self._frame_rgba.ravel(),
+            np.frombuffer(rgba_bytes, dtype=np.uint8, count=FRAME_WIDTH * FRAME_HEIGHT * 4)
+        )
+    
     def render(self) -> Optional[np.ndarray]:
         if self.render_mode == "rgb_array":
             return self._frame_rgb.copy()
@@ -232,17 +247,10 @@ class PokemonRedEnv(gym.Env):
         """Load emulator state."""
         self._gb.load_state(state)
     
-    def _read(self, addr: int) -> int:
-        """Direct memory read."""
-        return self._gb.read(addr)
-    
-    def _update_frame(self) -> None:
-        """Update frame buffer in-place."""
-        rgba_bytes = self._gb.get_frame_rgba()
-        np.copyto(
-            self._frame_rgba.ravel(),
-            np.frombuffer(rgba_bytes, dtype=np.uint8, count=FRAME_WIDTH * FRAME_HEIGHT * 4)
-        )
+    @property
+    def ram(self) -> np.ndarray:
+        """Direct access to cached RAM snapshot (valid after step/reset)."""
+        return self._ram
     
     def _get_info(self) -> dict[str, Any]:
         return {
@@ -264,4 +272,3 @@ def make_env(
 ) -> PokemonRedEnv:
     """Factory function for vectorized environments."""
     return PokemonRedEnv(rom_path, state_path=state_path, **kwargs)
-

@@ -255,6 +255,10 @@ class GameBoy:
         self._lib.zgbc_copy_memory(self._handle, buf, ctypes.c_size_t(0x10000))
         return memoryview(buf)
 
+    def snapshot_memory_into(self, buf: ctypes.Array) -> None:
+        """Copy 64KB address space into pre-allocated buffer (zero alloc)."""
+        self._lib.zgbc_copy_memory(self._handle, buf, ctypes.c_size_t(0x10000))
+
     def read_wram(self, offset: int) -> int:
         return int(self._wram_ptr[offset])
 
