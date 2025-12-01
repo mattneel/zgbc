@@ -4,25 +4,37 @@ High-performance Game Boy emulator in pure Zig. Full graphics, audio, save state
 
 ## Performance
 
-Pokemon Red benchmark (AMD Ryzen 9):
+Pokemon Red benchmark (Intel Core i9-13980HX):
 
 ```
 Single-thread performance:
-  Full (PPU+APU):     4,601 FPS (77x realtime)
-  Headless:          22,354 FPS (372x realtime)
+  Full (PPU+APU):        4,571 FPS (76x realtime)
+  PPU-only (no APU):    12,123 FPS (202x realtime)  <-- RL-relevant
+  Headless:             22,881 FPS (381x realtime)
 
 Headless multi-threaded scaling:
 Threads |    FPS    | Per-thread |  Scaling
 --------|-----------|------------|----------
-      1 |    22,930 |     22,930 |    1.03x
-      2 |    44,926 |     22,463 |    2.01x
-      4 |    84,007 |     21,002 |    3.76x
-      8 |   150,032 |     18,754 |    6.71x
-     16 |   188,180 |     11,761 |    8.42x
-     32 |   256,691 |      8,022 |   11.48x
+      1 |    22,818 |     22,818 |    1.00x
+      2 |    45,340 |     22,670 |    1.98x
+      4 |    84,773 |     21,193 |    3.70x
+      8 |   147,777 |     18,472 |    6.46x
+     16 |   185,249 |     11,578 |    8.10x
+     32 |   290,683 |      9,084 |   12.70x
 ```
 
-**256,691 FPS headless** at 32 threads — 4,278x realtime.
+**290,683 FPS headless** at 32 threads — 4,845x realtime.
+
+### RL Training Performance
+
+For reinforcement learning (PPU-only mode: graphics enabled for pixel observations, audio disabled):
+
+```
+PyBoy:     5,521 FPS
+zgbc:     10,589 FPS  (1.92x faster)
+```
+
+zgbc exceeds the ~6,000 FPS target for [PufferLib](https://github.com/PufferAI/PufferLib) integration.
 
 ## Features
 
