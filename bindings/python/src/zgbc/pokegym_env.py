@@ -80,8 +80,14 @@ class Environment(gym.Env):
         self._gb.set_headless(graphics=True, audio=False)
         self._gb.skip_boot()
         
-        # Load state if provided
+        # Load state - use bundled zgbc Bulbasaur.state by default
         self._initial_state: Optional[bytes] = None
+        if state_path is None:
+            # Default to bundled zgbc native state
+            bundled = Path(__file__).parent / "states" / "Bulbasaur.state"
+            if bundled.exists():
+                state_path = bundled
+        
         if state_path:
             state_path = Path(state_path)
             if state_path.exists():
