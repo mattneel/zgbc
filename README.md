@@ -30,11 +30,44 @@ Threads |    FPS    | Per-thread |  Scaling
 For reinforcement learning (PPU-only mode: graphics enabled for pixel observations, audio disabled):
 
 ```
-PyBoy:     5,521 FPS
-zgbc:     10,589 FPS  (1.92x faster)
+PyBoy:      5,370 FPS
+zgbc:      11,575 FPS  (2.16x faster)
 ```
 
 zgbc exceeds the ~6,000 FPS target for [PufferLib](https://github.com/PufferAI/PufferLib) integration.
+
+### PufferLib Integration
+
+zgbc includes a drop-in replacement for [pokegym](https://github.com/PufferAI/pokegym) that works with PufferLib out of the box:
+
+```bash
+# 1. Build zgbc
+zig build lib -Doptimize=ReleaseFast
+
+# 2. Install Python bindings
+cd bindings/python && pip install -e .
+
+# 3. Set library path
+export ZGBC_LIB=/path/to/zgbc/zig-out/lib/libzgbc.so
+
+# 4. Run PufferLib - no code changes needed!
+python -m pufferlib.experiments pokemon_red
+```
+
+The zgbc Python package includes a `pokegym` shim that intercepts `from pokegym import Environment` and redirects to zgbc's implementation. Verified parity:
+
+| Feature | pokegym | zgbc | Status |
+|---------|---------|------|--------|
+| Observation | (72, 80, 4) | (72, 80, 4) | ✓ Match |
+| Actions | Discrete(8) | Discrete(8) | ✓ Match |
+| Rewards | Full shaping | Full shaping | ✓ Match |
+| **Speed** | **5,370 FPS** | **11,575 FPS** | **2.16x faster** |
+
+Run the parity audit yourself:
+
+```bash
+python benchmarks/audit_pokegym.py roms/pokered.gb
+```
 
 ## Features
 
