@@ -33,7 +33,16 @@ __all__ = [
     "FRAME_HEIGHT",
     "SAMPLE_RATE",
     "load_library",
+    "PokemonRedEnv",
 ]
+
+
+def __getattr__(name: str):
+    """Lazy import for PokemonRedEnv to avoid numpy dependency at import time."""
+    if name == "PokemonRedEnv":
+        from .pokemon_env import PokemonRedEnv
+        return PokemonRedEnv
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
 
 FRAME_WIDTH = 160
 FRAME_HEIGHT = 144
