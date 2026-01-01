@@ -24,14 +24,13 @@ jobs:
         uses: mlugg/setup-zig@v2
 
       - name: Build WASM
-        run: zig build -Dtarget=wasm32-emscripten -Doptimize=ReleaseFast
+        run: zig build wasm
 
       - name: Prepare Pages artifact
         run: |
           mkdir -p _site
-          cp zig-out/web/* _site/
-          # Rename nova.html to index.html for GitHub Pages
-          mv _site/nova.html _site/index.html
+          cp web/index.html _site/
+          cp zig-out/bin/zgbc.wasm _site/
 
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3
